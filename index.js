@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
 
-app.post('/getLiveKitToken', (req, res) => {
+app.post('/getLiveKitToken', async (req, res) => {
   const { room, identity, name, metadata } = req.body ?? {};
 
   if (!room || !identity) {
@@ -30,7 +30,7 @@ app.post('/getLiveKitToken', (req, res) => {
     });
     token.addGrant({ roomJoin: true, room });
 
-    res.json({ token: token.toJwt() });
+    res.json({ token: await token.toJwt() });
   } catch (err) {
     console.error('Token generation error:', err);
     res.status(500).json({ error: 'Failed to generate token' });
