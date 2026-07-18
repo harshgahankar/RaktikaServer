@@ -3,7 +3,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import PORT, ALLOWED_ORIGINS
-from routers import health, chat, conversations, indexing
+from routers import health, chat, conversations, indexing, debug
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -24,6 +24,7 @@ app.include_router(health.router)
 app.include_router(chat.router)
 app.include_router(conversations.router)
 app.include_router(indexing.router)
+app.include_router(debug.router)
 
 
 @app.get("/")
