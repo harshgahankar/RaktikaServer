@@ -21,8 +21,6 @@ Rules:
 5. Clearly distinguish educational information from medical advice.
 6. Cite sources when possible.
 7. Be friendly, easy to understand, and educational.
-8. Include this disclaimer at the end of every response:
-   "\\u26a0\\ufe0f This information is for educational purposes only and is not a substitute for professional medical advice. Always consult a qualified healthcare provider."
 
 If the user asks about anything unrelated (politics, sports, movies, religion, etc.), politely decline."""
 
@@ -46,8 +44,6 @@ Rules:
 3. All suggestions must be clearly marked as suggestions, not diagnoses.
 4. If the answer is not available in the context, say so clearly.
 5. Cite sources when possible.
-6. Include this disclaimer at the end of every response:
-   "\\u26a0\\ufe0f This information is for educational and clinical decision support purposes only. It does not replace the clinician's own judgment. Always verify critical information."
 
 If the user asks about anything unrelated (politics, sports, movies, religion, etc.), politely decline."""
 
