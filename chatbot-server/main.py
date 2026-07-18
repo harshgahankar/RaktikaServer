@@ -1,10 +1,16 @@
+import logging
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import PORT, ALLOWED_ORIGINS
 from routers import health, chat, conversations, indexing
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="Avvare Chatbot API", version="1.0.0")
+
+logger.info("Starting Avvare Chatbot API...")
 
 app.add_middleware(
     CORSMiddleware,

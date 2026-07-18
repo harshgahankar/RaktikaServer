@@ -1,4 +1,6 @@
 import json
+import logging
+import traceback
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from models import ChatRequest
@@ -7,7 +9,30 @@ from services.vector_store import search as vector_search
 from services.llm import generate_response, stream_response
 from services import conversations as conv_service
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+async def _get_context_chunks(message: str):
+    try:
+        query_embedding = await embed(message)
+        search_results = await vector_search(query_embedding, top_k=5)
+        return [
+            {"text": r["text"], "source": r["source"], "title": r["title"], "score": r["score"]}
+            for r in search_results
+        ]
+    except Exception as e:
+        logger.warning(f"Embedding/search failed, continuing without RAG: {e}")
+        logger.warning(traceback.format_exc())
+        return []
+
+
+def _make_sources(context_chunks: list[dict]) -> list[dict]:
+    return [
+        {"title": c["title"], "source": c["source"]}
+        for c in context_chunks
+        if c.get("score", 0) > 0.7
+    ]
 
 
 @router.post("/api/chat")
@@ -17,23 +42,13 @@ async def chat(req: ChatRequest):
 
     user_role = "doctor" if req.role == "doctor" else "patient"
 
-    if req.conversationId:
-        conv = conv_service.get_conversation(req.conversationId)
-        if not conv:
-            conv = conv_service.create_conversation(req.userId, user_role)
-    else:
+    conv = conv_service.get_conversation(req.conversationId) if req.conversationId else None
+    if not conv:
         conv = conv_service.create_conversation(req.userId, user_role)
 
     conv_service.add_message(conv["id"], {"role": "user", "content": req.message})
 
-    query_embedding = await embed(req.message)
-    search_results = await vector_search(query_embedding, top_k=5)
-
-    context_chunks = [
-        {"text": r["text"], "source": r["source"], "title": r["title"], "score": r["score"]}
-        for r in search_results
-    ]
-
+    context_chunks = await _get_context_chunks(req.message)
     history = conv_service.get_history(conv["id"])
 
     reply = await generate_response(
@@ -51,11 +66,7 @@ async def chat(req: ChatRequest):
         "reply": reply,
         "conversationId": conv["id"],
         "messageId": last_msg["id"],
-        "sources": [
-            {"title": c["title"], "source": c["source"]}
-            for c in context_chunks
-            if c["score"] > 0.7
-        ],
+        "sources": _make_sources(context_chunks),
     }
 
 
@@ -66,37 +77,32 @@ async def chat_stream(req: ChatRequest):
 
     user_role = "doctor" if req.role == "doctor" else "patient"
 
-    if req.conversationId:
-        conv = conv_service.get_conversation(req.conversationId)
-        if not conv:
-            conv = conv_service.create_conversation(req.userId, user_role)
-    else:
+    conv = conv_service.get_conversation(req.conversationId) if req.conversationId else None
+    if not conv:
         conv = conv_service.create_conversation(req.userId, user_role)
 
     conv_service.add_message(conv["id"], {"role": "user", "content": req.message})
 
-    query_embedding = await embed(req.message)
-    search_results = await vector_search(query_embedding, top_k=5)
-
-    context_chunks = [
-        {"text": r["text"], "source": r["source"], "title": r["title"], "score": r["score"]}
-        for r in search_results
-    ]
-
+    context_chunks = await _get_context_chunks(req.message)
     history = conv_service.get_history(conv["id"])
 
     async def event_stream():
         full_reply = ""
-        async for token in stream_response(
-            messages=history, context_chunks=context_chunks, role=user_role
-        ):
-            full_reply += token
-            yield f"data: {json.dumps({'token': token})}\n\n"
+        try:
+            async for token in stream_response(
+                messages=history, context_chunks=context_chunks, role=user_role
+            ):
+                full_reply += token
+                yield f"data: {json.dumps({'token': token})}\n\n"
+        except Exception as e:
+            logger.error(f"Stream error: {e}")
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            return
 
         bot_msg = {
             "role": "assistant",
             "content": full_reply,
-            "sources": [c for c in context_chunks if c["score"] > 0.7],
+            "sources": [c for c in context_chunks if c.get("score", 0) > 0.7],
         }
         updated_conv = conv_service.add_message(conv["id"], bot_msg)
         last_msg = updated_conv["messages"][-1]
