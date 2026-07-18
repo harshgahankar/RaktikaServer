@@ -18,20 +18,16 @@ async def chat_diag():
         results["import_models"] = f"FAIL: {e}"
 
     try:
-        from services.embeddings import embed, _get_model
+        from services.embeddings import embed
         results["import_embeddings"] = "ok"
         try:
-            m = _get_model()
-            results["embed_model_loaded"] = "ok"
             emb = await embed("test")
             results["embed_dim"] = len(emb)
             results["embed_first_5"] = emb[:5]
         except Exception as e:
-            results["embed_model_test"] = f"FAIL: {e}"
-            results["embed_traceback"] = traceback.format_exc()
+            results["embed_test"] = f"FAIL: {e}"
     except Exception as e:
         results["import_embeddings"] = f"FAIL: {e}"
-        results["embed_traceback"] = traceback.format_exc()
 
     try:
         from services.vector_store import search

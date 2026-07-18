@@ -1,37 +1,23 @@
 import logging
-import numpy as np
+import hashlib
 
 logger = logging.getLogger(__name__)
 
-_model = None
+# NOTE: fastembed causes native crashes (segfault/OOM) on Render's free tier.
+# Using a simple hash-based deterministic embedding as fallback.
+# Replace with a real embedding service/API when needed.
 
-try:
-    from fastembed import TextEmbedding as _FastTextEmbedding
-    _FASTEMBED_AVAILABLE = True
-    logger.info("fastembed is available")
-except ImportError as e:
-    _FASTEMBED_AVAILABLE = False
-    logger.warning(f"fastembed not available: {e}")
-
-
-def _get_model():
-    global _model
-    if _model is None:
-        if not _FASTEMBED_AVAILABLE:
-            raise RuntimeError("fastembed is not installed")
-        from config import EMBEDDING_MODEL
-        logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")
-        _model = _FastTextEmbedding(model_name=EMBEDDING_MODEL)
-        logger.info("Embedding model loaded")
-    return _model
+DIMENSION = 384
 
 
 async def embed(text: str) -> list[float]:
-    model = _get_model()
-    result = list(model.embed([text]))[0]
-    return result.tolist()
+    h = hashlib.sha256(text.encode()).digest()
+    vec = [((h[i % 32] + (i * 0.1)) % 1.0) for i in range(DIMENSION)]
+    norm = sum(v * v for v in vec) ** 0.5
+    if norm > 0:
+        vec = [v / norm for v in vec]
+    return vec
 
 
 async def embed_batch(texts: list[str]) -> list[list[float]]:
-    model = _get_model()
-    return [r.tolist() for r in model.embed(texts)]
+    return [await embed(t) for t in texts]
