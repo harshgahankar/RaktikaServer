@@ -4,8 +4,6 @@ from config import QDRANT_URL, QDRANT_API_KEY
 
 COLLECTION = "raktika_knowledge_base"
 
-# Must match the embedding model's output dimension
-# bge-small-en-v1.5 → 384, bge-base-en-v1.5 → 768, bge-large-en-v1.5 → 1024
 try:
     from config import EMBEDDING_MODEL as _em
     if "large" in _em:
@@ -51,14 +49,18 @@ async def upsert_points(points: list[dict]):
 async def search(
     vector: list[float], top_k: int = 5, qdrant_filter: dict | None = None
 ) -> list[dict]:
-    await ensure_collection()
     client = _get_client()
-    results = client.search(
-        collection_name=COLLECTION,
-        query_vector=vector,
-        limit=top_k,
-        with_payload=True,
-    )
+    try:
+        results = client.search(
+            collection_name=COLLECTION,
+            query_vector=vector,
+            limit=top_k,
+            with_payload=True,
+        )
+    except AttributeError:
+        results = client.query_points(
+            collection_name=COLLECTION, query=vector, limit=top_k, with_payload=True
+        ).points
     return [
         {
             "text": r.payload.get("text", ""),
