@@ -3,7 +3,19 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 from config import QDRANT_URL, QDRANT_API_KEY
 
 COLLECTION = "raktika_knowledge_base"
-VECTOR_SIZE = 1024
+
+# Must match the embedding model's output dimension
+# bge-small-en-v1.5 → 384, bge-base-en-v1.5 → 768, bge-large-en-v1.5 → 1024
+try:
+    from config import EMBEDDING_MODEL as _em
+    if "large" in _em:
+        VECTOR_SIZE = 1024
+    elif "base" in _em:
+        VECTOR_SIZE = 768
+    else:
+        VECTOR_SIZE = 384
+except Exception:
+    VECTOR_SIZE = 384
 
 _client = None
 
